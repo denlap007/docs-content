@@ -1303,6 +1303,10 @@
                     "slug": "routes"
                   },
                   {
+                    "label": "Understanding Cloud Twins",
+                    "slug": "twins"
+                  },
+                  {
                     "label": "MQTT Web Client",
                     "slug": "webclient"
                   },

@@ -1,0 +1,187 @@
+---
+title: IoT Cloud Twins reference
+description: This article describes IoT Cloud Twins
+excerpt: |
+  This article describes IoT Devices features.
+totalTime: PT5M
+keywords: IoT, Hub, Device, Twin, Reference
+---
+
+## Overview
+
+<Message type="note">
+
+This feature is currently in **beta** status.
+
+</Message>
+
+Cloud Twins are virtual representations of your physical assets. Technically, they are JSON document sets stored in the [Hub](/iot/iot-hub/reference-content/hubs/). You can store and fetch data at any time in those documents.
+
+A Cloud twin is associated to each [Device](/iot/iot-hub/reference-content/devices/) and *remains online* regardless of the actual device state.
+
+* The Hub provides a REST API to all twins.
+* The device has a dedicated inband API over MQTT to interact with its own twin.
+
+## Document Store
+
+Each twin is a document store, it can hold several JSON documents.
+A Document is identified by the twin ID (`twin_id`) and a name.
+
+As each device has a twin: the `twin_id` is equal to the corresponding `device_id`.
+
+### Document Name
+
+There is a restriction on the characters allowed to form a `document_name`. It can use letters, numbers, dash, underscore, dot and tilde only (`[-_.~0-9a-zA-Z]`).
+
+<Message type="important">
+
+The document named `_config` is reserved and cannot be used.
+
+</Message>
+
+<Message type="tip">
+
+Create your documents such that both REST and MQTT inband API don't write the same. A good example is the `current_state` / `desired_state` pair.
+
+</Message>
+
+### Document Format
+
+A document is a JSON formatted object with the following format:
+```json
+{
+    "version": 1,
+    "data": {
+    }
+}
+```
+
+Where:
+- `version` is the current version of the document, it starts at `1` and is incremented each time the document is changed.
+- `data` can be filled with any valid JSON object of your choice.
+
+<Message type="important">
+
+Names starting with the underscore `_` character are reserved.
+While valid, also avoid using special characters in your key name (in particular dot `.` and slash `/`).
+(Both might conflict with future API and configuration options).
+
+</Message>
+
+## Accessing the documents
+
+The concepts are similar for both MQTT and REST APIs, there are 3 basic operations you can do on a document:
+
+1. **Get**: Get the content of a chosen document.
+2. **Put**: Create or replace a document.
+3. **Patch**: Update a part of a document (see patch format [below](#document-patch-format)).
+
+### Simplified Version Handling
+
+To manage concurrency and ensure each actor has a chance to modify the document without loosing changes done by another actor, the Twins provide optimistic locking through version numbers.
+
+- A document is created with version 1.
+- For each modifications the version is incremented by 1.
+- To avoid data loss, an actor must provide the current version number along with the modifications to the document.
+- If the provided version is incorrect, the operation is not done and an error is returned.
+
+<Message type="note">
+
+For simple case concurrency is not an issue. So providing version is optional: not setting it or setting it to 0, will ignore the version constraint for that request.
+
+</Message>
+
+### Document Patch Format
+
+The Patch format is a regular JSON document respecting the following rules:
+
+- Keys not in the patch are not modified.
+- Keys with a null value in the patch are removed.
+- Keys with non-null value behave this way:
+  - Primitive types (strings, numbers, booleans) are replaced.
+  - Arrays are fully replaced and cannot contain null values.
+  - Objects sub-keys are updated using the same rules.
+
+### Cloud twins REST API
+
+The REST API is documented on the [Scaleway Developers Website](https://developers.scaleway.com/en/products/iot/api/#iot-cloud-twins-15fc60).
+
+### Cloud twins inband MQTT API
+
+The device can communicate with it's own twin through inband MQTT API.
+
+The general use of the inband MQTT API is similar for all methods (get, put, patch):
+1. Subscribe to the response topic.
+2. Publish a request.
+
+<Message type="note">
+
+Inband API MQTT messages are not dispatched to other devices. A response is only sent to the connection issuing the request.
+
+</Message>
+
+#### Response Topics
+
+The response topics are using the following scheme:
+ - `$SCW/twins/<twin_id>/<document_name>/<method>/response/error`
+ - `$SCW/twins/<twin_id>/<document_name>/<method>/response/success`
+
+Where:
+ - `<twin_id>` is the twin id or alternatively the string `me`.
+ - `<document_name>` is the document name.
+ - `<method>` is one of `get`, `put` or `patch`.
+
+In case of an error, the response will arise on the ...`/error` topic with a payload formatted in JSON as follows:
+```json
+{
+    "error": "<error message>"
+}
+```
+
+In case of success, the response will arise on the ...`/success` topic with the (new) document:
+```json
+{
+    "version": <x>,
+    "data": {
+        <...customer_data>
+    }
+}
+```
+
+#### The get method
+
+To implement a get:
+1. Subscribe to the `get` response topics.
+2. Publish an empty payload on `$SCW/twins/<twin_id>/<document_name>/get`.
+3. You should receive the document on the `$SCW/twins/<twin_id>/<document_name>/get/response/success` topic (or an error on the ...`/error` topic).
+
+#### The put method
+
+To implement a put:
+1. Subscribe to the `put` response topics.
+2. Publish a valid document JSON on `$SCW/twins/<twin_id>/<document_name>/put`.
+3. You should receive the document on the `$SCW/twins/<twin_id>/<document_name>/put/response/success` topic (or an error on the ...`/error` topic).
+
+<Message type="note">
+
+See above about [version handling](#simplified-version-handling).
+
+</Message>
+
+#### The patch method
+
+To implement a patch:
+1. Subscribe to the `patch` response topics.
+2. Publish a patch formatted document on `$SCW/twins/<twin_id>/<document_name>/patch`.
+3. You should receive the document on the `$SCW/twins/<twin_id>/<document_name>/patch/response/success` topic (or an error on the ...`/error` topic).
+
+<Message type="note">
+
+See above about [version handling](#simplified-version-handling) and [Patch Format](#document-patch-format).
+
+</Message>
+
+<Navigation title="See Also">
+  <PreviousButton to="/iot/iot-hub/reference-content/routes/">Understanding Routes</PreviousButton>
+  <NextButton to="/iot/iot-hub/reference-content/webclient/">MQTT WebClient</NextButton>
+</Navigation>
