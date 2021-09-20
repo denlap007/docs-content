@@ -35,7 +35,7 @@ There is a restriction on the characters allowed to form a `document_name`. It c
 
 <Message type="important">
 
-The document named `_config` is reserved and cannot be used.
+The document named `_config` is reserved and cannot be used as a normal document see [bellow](#twins-configuration).
 
 </Message>
 
@@ -180,6 +180,58 @@ To implement a patch:
 See above about [version handling](#simplified-version-handling) and [Patch Format](#document-patch-format).
 
 </Message>
+
+## Twins configuration
+
+The `_config` document associates configuration values to your documents, its keys and subkeys enabling more twins features.
+
+The `_config` document is accessed as any normal twin document, however its content has a special meaning.
+
+### Configuration document format
+
+The `_config` document is formatted as follows:
+```json
+{
+    "version": <x>,
+    "data": {
+        "documents": {
+            "<document_name>": {
+                "_<config_key>": "<config_value>",
+                "<document_key>": {
+                    "_<config_key>": "<config_value>"
+                }
+                <...>
+            },
+            <... more document names>
+        }
+    }
+}
+```
+
+- `<document_name>` is the name of the document you want to configure.
+- `_<config_key>`, `<config_value>` are configuration parameters, see [bellow](#configuration-parameters).
+- `<document_key>` is a key of your document where you want a more precise configuration.
+
+The document is seen as a tree, when a configuration parameter is set it's applied to all the subkey of this level. Setting the same `_<config_key>` again for a particular `<document_key>` will replace the values for this `<document_key>` and all it's subkey (it can be replaced by `null` to delete the configuration).
+
+### Configuration parameters
+
+The following parameters are available:
+
+- `_tags`: associate a set of tags (key/value pairs) to the key.
+- `_tsdb_trigger`: enable pushing all the numerical subkeys to a [Time Series Database](#time-series-database-integration). Possible values are `on-update` or `on-change`.
+  - `on-update` will trigger the push whenever the value is present in a successful Put or Patch request.
+  - `on-change` will trigger the push whenever the value is modified by a Put or Patch request.
+
+## Time Series Database integration
+
+Currently only the graphite Database integration is available.
+
+It's enabled at 2 levels:
+1. in the hub's configuration set the push url of your graphite instance.
+2. use the `_config` document to select which keys to push.
+
+Only the numerical values are supported (booleans are converted to 0 or 1): when selecting a document or key in the configuration, only the numerical values of the leaves under it will be pushed.
 
 <Navigation title="See Also">
   <PreviousButton to="/iot/iot-hub/reference-content/routes/">Understanding Routes</PreviousButton>
